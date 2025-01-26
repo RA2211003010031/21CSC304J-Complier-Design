@@ -87,6 +87,7 @@ int main(){
     cin>>expression;
     string convert = infix_postfix(expression);
     int answer = evaluate(convert);
+    cout << "The postfix expression is: " << convert << endl;
     cout << "The result is: " << answer << endl;
     return 0;
 }
