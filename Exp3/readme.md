@@ -46,7 +46,8 @@ To set up the project, you need to have **MSYS2** installed on your system. Foll
     Execute the compiled program:
     ```sh:
     ./calc
-
+    ```
+    
 4. **Enter Expressions**:
     Enter arithmetic expressions to evaluate them. For example:
     ```sh
