@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "calc.tab.h"  // Include Bison header
+#include "calc.tab.h"
 
 void yyerror(const char *s);
 %}
