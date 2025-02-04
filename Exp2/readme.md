@@ -1,7 +1,3 @@
-Below is a well-structured `README.md` file for the provided code. This README explains the purpose of the program, its functionality, and how to use it.
-
----
-
 # Lexical Analyzer (Tokenizer) for C Code
 
 ## 📌 Overview
