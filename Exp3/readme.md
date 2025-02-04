@@ -18,11 +18,15 @@ To set up the project, you need to have **MSYS2** installed on your system. Foll
    pacman -Syu
 
 3. **Install Required Packages:** 
-    Install Flex, Bison, and GCC using the following      command**:
+    Install Flex, Bison, and GCC using the following command:
     ```sh
     pacman -S flex bison gcc
     ```
-    add the path 
+    add the path
+    ```sh
+    C:\msys64\usr\bin
+    ```
+    in edit the system enviornment variable
 
 ## 🚀 Usage
 
