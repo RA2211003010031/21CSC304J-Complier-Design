@@ -40,6 +40,38 @@ This file contains a more comprehensive implementation to eliminate left recursi
 - Eliminates left recursion and prints the transformed grammar.
 - Performs left factoring and prints the final transformed grammar.
 
+### [Left_factroing.cpp](#file:Left_factroing.cpp-context)
+
+This file contains an implementation to perform left factoring on a given grammar.
+
+#### Functions
+
+- `string commonPrefix(string a, string b)`: Finds the common prefix of two strings.
+- `void leftFactorGrammar(vector<Production>& grammar)`: Performs left factoring on the given grammar.
+
+#### Main Function
+
+- Prompts the user to enter the number of productions.
+- Reads the non-terminals and their productions.
+- Performs left factoring and prints the transformed grammar.
+
+### [Left_recursion.cpp](#file:Left_recursion.cpp-context)
+
+This file contains an implementation to eliminate left recursion from a given grammar.
+
+#### Functions
+
+- `string trim(const string& str)`: Trims spaces from a string.
+- `bool hasLeftRecursion(const Production& prod)`: Checks if a production has left recursion.
+- `void eliminateLeftRecursion(vector<Production>& grammar)`: Eliminates direct left recursion from the given grammar.
+- `void printGrammar(const vector<Production>& grammar)`: Prints the given grammar in a readable format.
+
+#### Main Function
+
+- Prompts the user to enter the number of productions.
+- Reads the non-terminals and their productions.
+- Eliminates left recursion and prints the transformed grammar.
+
 ## Usage
 
 1. Compile the C++ files using a C++ compiler.
@@ -47,6 +79,6 @@ This file contains a more comprehensive implementation to eliminate left recursi
 
 ## Example
 
-For `Exp4_simple.cpp`, the program will prompt for input and display the transformed grammar based on the input provided.
+For `Left_factroing.cpp`, the program will prompt for input and display the left-factored grammar.
 
-For `Exp4_Medium.cpp`, the program will display the original grammar, the grammar after eliminating left recursion, and the grammar after performing left factoring.
+For `Left_recursion.cpp`, the program will prompt for input and display the grammar after eliminating left recursion.
