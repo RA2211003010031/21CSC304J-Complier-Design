@@ -1,63 +1,98 @@
 #include <iostream>
-#include <string>
-
+#include <vector>
+#include <sstream>
 using namespace std;
 
-void removeLeftRecursion(string A, string alpha, string beta) {
-    cout << "\nAfter removing left recursion:\n";
-    cout << A << " -> " << beta << A << "'\n";
-    cout << A << "' -> " << alpha << A << "' | ε\n";
-}
+struct Production {
+    string nonTerminal;
+    vector<string> productions;
+};
 
-void performLeftFactoring(string A, string common, string beta1, string beta2) {
-    cout << "\nAfter left factoring:\n";
-    cout << A << " -> " << common << A << "'\n";
-    cout << A << "' -> " << beta1 << " | " << beta2 << endl;
-}
-
-bool hasLeftRecursion(string A, string part) {
-    return (A == part);
-}
-
-bool hasCommonPrefix(string part1, string part2, string &common) {
-    int i = 0;
-    while (i < part1.length() && i < part2.length() && part1[i] == part2[i]) {
-        common += part1[i];
-        i++;
+// Function to find the common prefix of two strings
+string commonPrefix(string a, string b) {
+    string prefix = "";
+    int len = min(a.length(), b.length());
+    for (int i = 0; i < len; i++) {
+        if (a[i] == b[i])
+            prefix += a[i];
+        else
+            break;
     }
-    return !common.empty();
+    return prefix;
+}
+
+// Function to perform left factoring
+void leftFactorGrammar(vector<Production> &grammar) {
+    vector<Production> newGrammar;
+    
+    for (auto &prod : grammar) {
+        string prefix = prod.productions[0];
+        for (size_t i = 1; i < prod.productions.size(); i++) {
+            prefix = commonPrefix(prefix, prod.productions[i]);
+        }
+        
+        if (prefix.length() == 0) {
+            newGrammar.push_back(prod);
+            continue;
+        }
+        
+        Production newProd;
+        newProd.nonTerminal = prod.nonTerminal + "'";
+        vector<string> remaining;
+        
+        for (string rule : prod.productions) {
+            if (rule.substr(0, prefix.length()) == prefix) {
+                string suffix = rule.substr(prefix.length());
+                if (suffix == "") suffix = "epsilon";
+                newProd.productions.push_back(suffix);
+            } else {
+                remaining.push_back(rule);
+            }
+        }
+        
+        prod.productions.clear();
+        prod.productions.push_back(prefix + newProd.nonTerminal);
+        for (string r : remaining) {
+            prod.productions.push_back(r);
+        }
+        
+        newGrammar.push_back(prod);
+        newGrammar.push_back(newProd);
+    }
+    
+    // Print the left-factored grammar
+    cout << "\nLeft Factored Grammar:\n";
+    for (auto &prod : newGrammar) {
+        cout << prod.nonTerminal << " -> ";
+        for (size_t i = 0; i < prod.productions.size(); i++) {
+            cout << prod.productions[i];
+            if (i != prod.productions.size() - 1) cout << " | ";
+        }
+        cout << endl;
+    }
 }
 
 int main() {
-    string A, part1, part2;
-    cout << "Enter the non-terminal: ";
-    cin >> A;
-    cout << "Enter the first production rule part: ";
-    cin >> part1;
-    cout << "Enter the second production rule part: ";
-    cin >> part2;
+    int n;
+    cout << "Enter the number of productions: ";
+    cin >> n;
+    cin.ignore();
 
-    if (hasLeftRecursion(A, part1)) {
-        string alpha, beta;
-        cout << "Detected Left Recursion!\n";
-        cout << "Enter α: ";
-        cin >> alpha;
-        cout << "Enter β: ";
-        cin >> beta;
-        removeLeftRecursion(A, alpha, beta);
-    } 
-    else {
-        string common = "";
-        if (hasCommonPrefix(part1, part2, common)) {
-            string beta1 = part1.substr(common.length());
-            string beta2 = part2.substr(common.length());
-            cout << "Detected Left Factoring!\n";
-            performLeftFactoring(A, common, beta1, beta2);
-        } 
-        else {
-            cout << "No transformation needed.\n";
+    vector<Production> grammar(n);
+    for (int i = 0; i < n; ++i) {
+        cout << "Enter the non-terminal for production " << i + 1 << ": ";
+        getline(cin, grammar[i].nonTerminal);
+
+        cout << "Enter the productions for " << grammar[i].nonTerminal << " (separated by '|'): ";
+        string line;
+        getline(cin, line);
+        stringstream ss(line);
+        string production;
+        while (getline(ss, production, '|')) {
+            grammar[i].productions.push_back(production);
         }
     }
 
+    leftFactorGrammar(grammar);
     return 0;
 }
