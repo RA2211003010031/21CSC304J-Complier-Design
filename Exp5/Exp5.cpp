@@ -2,275 +2,246 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <string>
 #include <sstream>
-#include <algorithm>
 
 using namespace std;
 
-struct Production {
-    string nonTerminal;
-    vector<string> productions;
-};
+map<string, set<char>> FIRST, FOLLOW;
+map<string, vector<string>> grammar;
+map<string, map<char, string>> parsingTable;
 
-vector<Production> grammar;
-map<string, set<string>> FIRST, FOLLOW;
-map<pair<string, string>, string> parsingTable;
+void computeFIRST(string nonTerminal);
+void computeFOLLOW(string nonTerminal);
+void constructParsingTable();
 
-// Function to print grammar rules
-void printGrammar(const vector<Production> &grammar) {
-    cout << "\nGrammar Rules:\n";
-    for (const auto &prod : grammar) {
-        cout << prod.nonTerminal << " -> ";
-        for (size_t i = 0; i < prod.productions.size(); i++) {
-            cout << prod.productions[i];
-            if (i != prod.productions.size() - 1) cout << " | ";
-        }
-        cout << endl;
+void eliminateLeftRecursion(string nonTerminal, vector<string> productions) {
+    vector<string> alpha, beta;
+    string newNonTerminal = nonTerminal + "'";
+
+    cout << "\nChecking for Left Recursion in " << nonTerminal << "...\n";
+    cout << nonTerminal << " -> ";
+    for (size_t i = 0; i < productions.size(); i++) {
+        if (i > 0) cout << " | ";
+        cout << productions[i];
     }
-}
+    cout << endl;
 
-// Left Recursion Elimination
-void eliminateLeftRecursion(vector<Production> &grammar) {
-    cout << "\nEliminating Left Recursion...\n";
-    vector<Production> newGrammar;
-
-    for (auto &prod : grammar) {
-        string A = prod.nonTerminal;
-        vector<string> alpha, beta;
-
-        for (auto &p : prod.productions) {
-            if (p.find(A) == 0) {
-                alpha.push_back(p.substr(A.size())); // Left recursion case
-            } else {
-                beta.push_back(p); // Non-left-recursive case
-            }
-        }
-
-        if (!alpha.empty()) {
-            Production newProd;
-            newProd.nonTerminal = A + "'";
-
-            for (auto &a : alpha) {
-                newProd.productions.push_back(a + newProd.nonTerminal);
-            }
-            newProd.productions.push_back("epsilon");
-
-            prod.productions.clear();
-            for (auto &b : beta) {
-                prod.productions.push_back(b + newProd.nonTerminal);
-            }
-
-            newGrammar.push_back(newProd);
-        }
-        newGrammar.push_back(prod);
-    }
-    grammar = newGrammar;
-    printGrammar(grammar);
-}
-
-// Function to find common prefix for left factoring
-string commonPrefix(string a, string b) {
-    string prefix = "";
-    int len = min(a.length(), b.length());
-    for (int i = 0; i < len; i++) {
-        if (a[i] == b[i])
-            prefix += a[i];
+    for (string prod : productions) {
+        if (prod[0] == nonTerminal[0])
+            alpha.push_back(prod.substr(1));
         else
-            break;
+            beta.push_back(prod);
     }
-    return prefix;
-}
 
-// Left Factoring
-void leftFactorGrammar(vector<Production> &grammar) {
-    cout << "\nPerforming Left Factoring...\n";
-    vector<Production> newGrammar;
+    if (alpha.empty()) {
+        grammar[nonTerminal] = productions;
+        return;
+    }
+
+    vector<string> newBeta;
+    for (const string &b : beta)
+        newBeta.push_back(b + newNonTerminal);
     
-    for (auto &prod : grammar) {
-        string prefix = prod.productions[0];
-        for (size_t i = 1; i < prod.productions.size(); i++) {
-            prefix = commonPrefix(prefix, prod.productions[i]);
-        }
-        
-        if (prefix.empty()) {
-            newGrammar.push_back(prod);
-            continue;
-        }
-        
-        Production newProd;
-        newProd.nonTerminal = prod.nonTerminal + "'";
+    vector<string> newAlpha;
+    for (const string &a : alpha)
+        newAlpha.push_back(a + newNonTerminal);
+    newAlpha.push_back("ε");
 
-        vector<string> remaining;
-        for (string rule : prod.productions) {
-            if (rule.substr(0, prefix.length()) == prefix) {
-                string suffix = rule.substr(prefix.length());
-                if (suffix.empty()) suffix = "epsilon";
-                newProd.productions.push_back(suffix);
-            } else {
-                remaining.push_back(rule);
-            }
-        }
-        
-        prod.productions.clear();
-        prod.productions.push_back(prefix + newProd.nonTerminal);
-        for (string r : remaining) {
-            prod.productions.push_back(r);
-        }
-        
-        newGrammar.push_back(prod);
-        newGrammar.push_back(newProd);
+    grammar[nonTerminal] = newBeta;
+    grammar[newNonTerminal] = newAlpha;
+
+    // Print the transformed grammar
+    cout << "After Eliminating Left Recursion:\n";
+    cout << nonTerminal << " -> ";
+    for (size_t i = 0; i < newBeta.size(); i++) {
+        if (i > 0) cout << " | ";
+        cout << newBeta[i];
     }
+    cout << endl;
 
-    grammar = newGrammar;
-    printGrammar(grammar);
+    cout << newNonTerminal << " -> ";
+    for (size_t i = 0; i < newAlpha.size(); i++) {
+        if (i > 0) cout << " | ";
+        cout << newAlpha[i];
+    }
+    cout << endl;
 }
 
-// Function to compute FIRST sets
-void computeFIRST() {
-    cout << "\nComputing FIRST Sets...\n";
-    bool changed;
-    do {
-        changed = false;
-        for (auto &prod : grammar) {
-            set<string> &firstSet = FIRST[prod.nonTerminal];
+void leftFactoring(string nonTerminal, vector<string> productions) {
+    cout << "\nChecking for Left Factoring in " << nonTerminal << "...\n";
 
-            for (auto &rule : prod.productions) {
-                if (islower(rule[0]) || rule[0] == 'epsilon') {
-                    changed |= firstSet.insert(rule.substr(0, 1)).second;
-                } else {
-                    for (char ch : rule) {
-                        if (isupper(ch)) {
-                            set<string> &nextFIRST = FIRST[string(1, ch)];
-                            for (auto &f : nextFIRST) {
-                                if (f != "epsilon")
-                                    changed |= firstSet.insert(f).second;
-                            }
-                            if (nextFIRST.find("epsilon") == nextFIRST.end())
-                                break;
-                        } else {
-                            changed |= firstSet.insert(string(1, ch)).second;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    } while (changed);
+    string prefix = productions[0];
+    for (string prod : productions) {
+        size_t i = 0;
+        while (i < prefix.size() && i < prod.size() && prefix[i] == prod[i])
+            i++;
+        prefix = prefix.substr(0, i);
+    }
 
-    for (auto &entry : FIRST) {
-        cout << "FIRST(" << entry.first << ") = { ";
-        for (auto &val : entry.second) {
-            cout << val << " ";
+    if (prefix.empty()) {
+        grammar[nonTerminal] = productions;
+        return;
+    }
+
+    string newNonTerminal = nonTerminal + "'";
+    vector<string> newProductions;
+    for (const string &prod : productions) {
+        string suffix = prod.substr(prefix.size());
+        if (suffix.empty()) suffix = "ε";
+        newProductions.push_back(suffix);
+    }
+
+    grammar[nonTerminal] = {prefix + newNonTerminal};
+    grammar[newNonTerminal] = newProductions;
+
+    // Print the transformed grammar
+    cout << "After Left Factoring:\n";
+    cout << nonTerminal << " -> " << prefix << newNonTerminal << endl;
+    cout << newNonTerminal << " -> ";
+    for (size_t i = 0; i < newProductions.size(); i++) {
+        if (i > 0) cout << " | ";
+        cout << newProductions[i];
+    }
+    cout << endl;
+}
+
+void computeFIRST(string nonTerminal) {
+    if (!FIRST[nonTerminal].empty()) return;
+
+    for (const string &prod : grammar[nonTerminal]) {
+        if (!isupper(prod[0])) {
+            FIRST[nonTerminal].insert(prod[0]);
+        } else {
+            computeFIRST(string(1, prod[0]));
+            FIRST[nonTerminal].insert(FIRST[string(1, prod[0])].begin(), FIRST[string(1, prod[0])].end());
         }
-        cout << "}\n";
     }
 }
 
-// Function to compute FOLLOW sets
-void computeFOLLOW() {
-    cout << "\nComputing FOLLOW Sets...\n";
-    FOLLOW[grammar[0].nonTerminal].insert("$");
-
+void computeFOLLOW(string startSymbol) {
+    FOLLOW[startSymbol].insert('$'); // Add $ to FOLLOW of start symbol
     bool changed;
     do {
         changed = false;
-        for (auto &prod : grammar) {
-            string A = prod.nonTerminal;
-            for (auto &rule : prod.productions) {
-                for (size_t i = 0; i < rule.length(); i++) {
-                    if (isupper(rule[i])) {
-                        set<string> &followSet = FOLLOW[string(1, rule[i])];
+        for (auto &[lhs, productions] : grammar) {
+            for (const string &prod : productions) {
+                for (size_t i = 0; i < prod.length(); i++) {
+                    string currentSymbol = string(1, prod[i]);
+                    if (!isupper(prod[i])) continue; // Skip terminals
 
-                        if (i + 1 < rule.length()) {
-                            if (islower(rule[i + 1]))
-                                changed |= followSet.insert(string(1, rule[i + 1])).second;
-                            else {
-                                set<string> &nextFIRST = FIRST[string(1, rule[i + 1])];
-                                for (auto &f : nextFIRST) {
-                                    if (f != "epsilon")
-                                        changed |= followSet.insert(f).second;
+                    // Check if currentSymbol is followed by another symbol
+                    if (i + 1 < prod.length()) {
+                        string nextSymbol = string(1, prod[i + 1]);
+                        if (isupper(nextSymbol[0])) {
+                            // Add FIRST(nextSymbol) to FOLLOW(currentSymbol)
+                            for (char c : FIRST[nextSymbol]) {
+                                if (c != 'ε' && FOLLOW[currentSymbol].insert(c).second) {
+                                    changed = true;
                                 }
-                                if (nextFIRST.find("epsilon") != nextFIRST.end())
-                                    for (auto &f : FOLLOW[A])
-                                        changed |= followSet.insert(f).second;
+                            }
+                            // If FIRST(nextSymbol) contains ε, inherit FOLLOW(lhs)
+                            if (FIRST[nextSymbol].count('ε')) {
+                                for (char c : FOLLOW[lhs]) {
+                                    if (FOLLOW[currentSymbol].insert(c).second) {
+                                        changed = true;
+                                    }
+                                }
                             }
                         } else {
-                            for (auto &f : FOLLOW[A])
-                                changed |= followSet.insert(f).second;
+                            // If nextSymbol is a terminal, add it to FOLLOW(currentSymbol)
+                            if (FOLLOW[currentSymbol].insert(nextSymbol[0]).second) {
+                                changed = true;
+                            }
+                        }
+                    } else {
+                        // If currentSymbol is at the end, inherit FOLLOW(lhs)
+                        for (char c : FOLLOW[lhs]) {
+                            if (FOLLOW[currentSymbol].insert(c).second) {
+                                changed = true;
+                            }
                         }
                     }
                 }
             }
         }
     } while (changed);
-
-    for (auto &entry : FOLLOW) {
-        cout << "FOLLOW(" << entry.first << ") = { ";
-        for (auto &val : entry.second) {
-            cout << val << " ";
-        }
-        cout << "}\n";
-    }
 }
 
-// Function to construct parsing table
 void constructParsingTable() {
-    cout << "\nConstructing Predictive Parsing Table...\n";
-    for (auto &prod : grammar) {
-        for (auto &rule : prod.productions) {
-            set<string> firstSet;
-            if (islower(rule[0]) || rule[0] == 'epsilon') {
-                firstSet.insert(rule.substr(0, 1));
+    for (auto &[nonTerminal, productions] : grammar) {
+        for (const string &prod : productions) {
+            char firstChar = prod[0];
+            if (!isupper(firstChar)) {
+                parsingTable[nonTerminal][firstChar] = prod;
             } else {
-                firstSet = FIRST[string(1, rule[0])];
-            }
-
-            for (auto &f : firstSet) {
-                if (f != "epsilon")
-                    parsingTable[{prod.nonTerminal, f}] = rule;
-            }
-
-            if (firstSet.find("epsilon") != firstSet.end()) {
-                for (auto &f : FOLLOW[prod.nonTerminal]) {
-                    parsingTable[{prod.nonTerminal, f}] = "epsilon";
+                for (char terminal : FIRST[string(1, firstChar)]) {
+                    parsingTable[nonTerminal][terminal] = prod;
                 }
             }
         }
-    }
-
-    for (auto &entry : parsingTable) {
-        cout << "M[" << entry.first.first << ", " << entry.first.second << "] = " << entry.second << endl;
+        for (char terminal : FOLLOW[nonTerminal]) {
+            if (FIRST[nonTerminal].count('ε')) {
+                parsingTable[nonTerminal][terminal] = "ε";
+            }
+        }
     }
 }
 
-// Main function
 int main() {
-    int n;
-    cout << "Enter the number of productions: ";
-    cin >> n;
+    string nonTerminal;
+    cout << "Enter the non-terminal: ";
+    cin >> nonTerminal;
     cin.ignore();
 
-    grammar.resize(n);
-    for (int i = 0; i < n; i++) {
-        cout << "Enter the non-terminal: ";
-        getline(cin, grammar[i].nonTerminal);
+    cout << "Enter productions for " << nonTerminal << " (separated by '|', example: abS|aSb): ";
+    string input, prod;
+    getline(cin, input);
+    stringstream ss(input);
 
-        cout << "Enter the productions (separated by '|'): ";
-        string line;
-        getline(cin, line);
-        stringstream ss(line);
-        string prod;
-        while (getline(ss, prod, '|')) {
-            grammar[i].productions.push_back(prod);
-        }
+    vector<string> productions;
+    while (getline(ss, prod, '|')) {
+        productions.push_back(prod);
     }
 
-    printGrammar(grammar);
-    eliminateLeftRecursion(grammar);
-    leftFactorGrammar(grammar);
-    computeFIRST();
-    computeFOLLOW();
+    eliminateLeftRecursion(nonTerminal, productions);
+    leftFactoring(nonTerminal, grammar[nonTerminal]);
+
+    for (auto &[nt, prods] : grammar) {
+        computeFIRST(nt);
+        computeFOLLOW(nt);
+    }
+
     constructParsingTable();
+
+    cout << "\nFIRST sets:\n";
+    for (auto &[nt, firstSet] : FIRST) {
+        cout << "FIRST(" << nt << ") = { ";
+        for (auto it = firstSet.begin(); it != firstSet.end(); ++it) {
+            if (it != firstSet.begin()) cout << ", ";
+            cout << *it;
+        }
+        cout << " }\n";
+    }
+
+    cout << "\nFOLLOW sets:\n";
+    for (auto &[nt, followSet] : FOLLOW) {
+        cout << "FOLLOW(" << nt << ") = { ";
+        for (auto it = followSet.begin(); it != followSet.end(); ++it) {
+            if (it != followSet.begin()) cout << ", ";
+            cout << *it;
+        }
+        cout << " }\n";
+    }
+
+    cout << "\nParsing Table:\n";
+    for (auto &[nt, row] : parsingTable) {
+        cout << nt << " | ";
+        for (auto &[terminal, prod] : row) {
+            cout << terminal << " -> " << prod << " | ";
+        }
+        cout << "\n";
+    }
 
     return 0;
 }
