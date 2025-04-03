@@ -1,21 +1,16 @@
 #include <iostream>
 #include <vector>
-#include <string>
-#include <sstream>
 #include <stack>
 #include <cctype>
 
 using namespace std;
 
 struct Quadruple {
-    string op;
-    string arg1, arg2;
-    string result;
+    string op, arg1, arg2, result;
 };
 
 struct Triple {
-    string op;
-    string arg1, arg2;
+    string op, arg1, arg2;
 };
 
 struct IndirectTriple {
@@ -24,57 +19,55 @@ struct IndirectTriple {
 
 // Function to get operator precedence
 int precedence(char op) {
-    if (op == '*' || op == '/') return 2;
-    if (op == '+' || op == '-') return 1;
-    return 0;
+    return (op == '*' || op == '/') ? 2 : (op == '+' || op == '-') ? 1 : 0;
 }
 
-// Convert infix to postfix using Shunting Yard Algorithm
-vector<string> infixToPostfix(const string& expr) {
-    vector<string> postfix;
+// Convert infix to postfix (optimized version)
+void infixToPostfix(const string& expr, vector<string>& postfix) {
     stack<char> operators;
     string operand;
 
-    for (size_t i = 0; i < expr.length(); i++) {
-        if (isalnum(expr[i])) {
-            operand += expr[i];
+    for (char ch : expr) {
+        if (isalnum(ch)) {
+            operand += ch;
         } else {
             if (!operand.empty()) {
-                postfix.push_back(operand);
+                postfix.push_back(move(operand));
                 operand.clear();
             }
-            if (expr[i] == '(') {
-                operators.push(expr[i]);
-            } else if (expr[i] == ')') {
+            if (ch == '(') {
+                operators.push(ch);
+            } else if (ch == ')') {
                 while (!operators.empty() && operators.top() != '(') {
-                    postfix.push_back(string(1, operators.top()));
+                    postfix.emplace_back(1, operators.top());
                     operators.pop();
                 }
                 if (!operators.empty()) operators.pop(); // Pop '('
-            } else if (precedence(expr[i]) > 0) {
-                while (!operators.empty() && precedence(operators.top()) >= precedence(expr[i])) {
-                    postfix.push_back(string(1, operators.top()));
+            } else if (precedence(ch) > 0) {
+                while (!operators.empty() && precedence(operators.top()) >= precedence(ch)) {
+                    postfix.emplace_back(1, operators.top());
                     operators.pop();
                 }
-                operators.push(expr[i]);
+                operators.push(ch);
             }
         }
     }
-    if (!operand.empty()) postfix.push_back(operand);
+    if (!operand.empty()) postfix.push_back(move(operand));
     while (!operators.empty()) {
-        postfix.push_back(string(1, operators.top()));
+        postfix.emplace_back(1, operators.top());
         operators.pop();
     }
-    return postfix;
 }
 
+// Generate Three Address Code
 void generateTAC(const string& expr, vector<Quadruple>& quadruples, vector<Triple>& triples, vector<IndirectTriple>& indirectTriples) {
-    vector<string> postfix = infixToPostfix(expr);
+    vector<string> postfix;
+    infixToPostfix(expr, postfix);
+
     stack<string> operands;
     int tempCount = 1;
-    ostringstream output;
 
-    output << "\nThree Address Code (TAC):\n";
+    cout << "\nThree Address Code (TAC):\n";
     for (const string& token : postfix) {
         if (isalnum(token[0])) {
             operands.push(token);
@@ -83,39 +76,36 @@ void generateTAC(const string& expr, vector<Quadruple>& quadruples, vector<Tripl
                 cerr << "Error: Invalid expression (insufficient operands).\n";
                 return;
             }
-            string arg2 = operands.top(); operands.pop();
-            string arg1 = operands.top(); operands.pop();
+            string arg2 = move(operands.top()); operands.pop();
+            string arg1 = move(operands.top()); operands.pop();
             string temp = "t" + to_string(tempCount++);
 
-            output << temp << " = " << arg1 << " " << token << " " << arg2 << "\n";
+            cout << temp << " = " << arg1 << " " << token << " " << arg2 << "\n";
             quadruples.push_back({token, arg1, arg2, temp});
             triples.push_back({token, arg1, arg2});
             indirectTriples.push_back({static_cast<int>(triples.size() - 1)});
             operands.push(temp);
         }
     }
-    cout << output.str();
 }
 
+// Display functions (optimized with `const&`)
 void displayQuadruples(const vector<Quadruple>& quadruples) {
-    cout << "\nQuadruple Representation:\n";
-    cout << "Op\tArg1\tArg2\tResult\n";
-    for (const auto& quad : quadruples) {
-        cout << quad.op << "\t" << quad.arg1 << "\t" << quad.arg2 << "\t" << quad.result << "\n";
+    cout << "\nQuadruple Representation:\nOp\tArg1\tArg2\tResult\n";
+    for (const auto& q : quadruples) {
+        cout << q.op << "\t" << q.arg1 << "\t" << q.arg2 << "\t" << q.result << "\n";
     }
 }
 
 void displayTriples(const vector<Triple>& triples) {
-    cout << "\nTriple Representation:\n";
-    cout << "Index\tOp\tArg1\tArg2\n";
+    cout << "\nTriple Representation:\nIndex\tOp\tArg1\tArg2\n";
     for (size_t i = 0; i < triples.size(); i++) {
         cout << i << "\t" << triples[i].op << "\t" << triples[i].arg1 << "\t" << triples[i].arg2 << "\n";
     }
 }
 
 void displayIndirectTriples(const vector<IndirectTriple>& indirectTriples) {
-    cout << "\nIndirect Triple Representation:\n";
-    cout << "Index\tReference\n";
+    cout << "\nIndirect Triple Representation:\nIndex\tReference\n";
     for (size_t i = 0; i < indirectTriples.size(); i++) {
         cout << i << "\t" << indirectTriples[i].index << "\n";
     }
