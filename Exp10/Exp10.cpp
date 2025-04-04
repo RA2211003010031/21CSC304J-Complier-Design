@@ -34,10 +34,12 @@ vector<string> infixToPostfix(const string& expr) {
     vector<string> postfix;
     stack<char> operators;
     string operand;
+    bool lastWasOperator = true;  // To handle unary minus
 
     for (size_t i = 0; i < expr.length(); i++) {
         if (isalnum(expr[i])) {
             operand += expr[i];
+            lastWasOperator = false;
         } else {
             if (!operand.empty()) {
                 postfix.push_back(operand);
@@ -45,18 +47,26 @@ vector<string> infixToPostfix(const string& expr) {
             }
             if (expr[i] == '(') {
                 operators.push(expr[i]);
+                lastWasOperator = true;
             } else if (expr[i] == ')') {
                 while (!operators.empty() && operators.top() != '(') {
                     postfix.push_back(string(1, operators.top()));
                     operators.pop();
                 }
                 if (!operators.empty()) operators.pop(); // Pop '('
+                lastWasOperator = false;
             } else if (precedence(expr[i]) > 0) {
-                while (!operators.empty() && precedence(operators.top()) >= precedence(expr[i])) {
-                    postfix.push_back(string(1, operators.top()));
-                    operators.pop();
+                if (expr[i] == '-' && lastWasOperator) {
+                    // Handle unary minus by converting it to a special token (e.g., "u-")
+                    operators.push('u');  // Use 'u' to represent unary minus
+                } else {
+                    while (!operators.empty() && precedence(operators.top()) >= precedence(expr[i])) {
+                        postfix.push_back(string(1, operators.top()));
+                        operators.pop();
+                    }
+                    operators.push(expr[i]);
                 }
-                operators.push(expr[i]);
+                lastWasOperator = true;
             }
         }
     }
