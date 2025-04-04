@@ -26,10 +26,12 @@ int precedence(char op) {
 void infixToPostfix(const string& expr, vector<string>& postfix) {
     stack<char> operators;
     string operand;
+    bool unary = true; // Variable to track unary operator
 
     for (char ch : expr) {
         if (isalnum(ch)) {
             operand += ch;
+            unary = false;
         } else {
             if (!operand.empty()) {
                 postfix.push_back(move(operand));
@@ -37,18 +39,25 @@ void infixToPostfix(const string& expr, vector<string>& postfix) {
             }
             if (ch == '(') {
                 operators.push(ch);
+                unary = true;
             } else if (ch == ')') {
                 while (!operators.empty() && operators.top() != '(') {
                     postfix.emplace_back(1, operators.top());
                     operators.pop();
                 }
                 if (!operators.empty()) operators.pop(); // Pop '('
+                unary = false;
             } else if (precedence(ch) > 0) {
+                if (unary && (ch == '-' || ch == '+')) {
+                    // Handle unary operators by pushing a '0' operand
+                    postfix.push_back("0");
+                }
                 while (!operators.empty() && precedence(operators.top()) >= precedence(ch)) {
                     postfix.emplace_back(1, operators.top());
                     operators.pop();
                 }
                 operators.push(ch);
+                unary = true;
             }
         }
     }
