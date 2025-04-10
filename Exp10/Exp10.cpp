@@ -1,149 +1,149 @@
 #include <iostream>
+#include <stack>
 #include <vector>
 #include <string>
-#include <sstream>
-#include <stack>
 #include <cctype>
 
 using namespace std;
 
-struct Quadruple {
-    string op;
-    string arg1, arg2;
-    string result;
+int tempCount = 1;
+vector<string> threeAddressCode;
+
+struct Quad {
+    string op, arg1, arg2, result;
 };
+vector<Quad> quadruples;
 
 struct Triple {
-    string op;
-    string arg1, arg2;
+    string op, arg1, arg2;
 };
+vector<Triple> triples;
 
-struct IndirectTriple {
-    int index;
-};
-
-// Function to get operator precedence
-int precedence(char op) {
-    if (op == '*' || op == '/') return 2;
-    if (op == '+' || op == '-') return 1;
-    return 0;
+string newTemp() {
+    return "T" + to_string(tempCount++);
 }
 
-// Convert infix to postfix using Shunting Yard Algorithm
-vector<string> infixToPostfix(const string& expr) {
-    vector<string> postfix;
-    stack<char> operators;
-    string operand;
-    bool lastWasOperator = true;  // To handle unary minus
+inline int precedence(char op) {
+    switch (op) {
+        case '+': case '-': return 1;
+        case '*': case '/': return 2;
+        case '~': return 3; // unary minus
+        default: return 0;
+    }
+}
 
-    for (size_t i = 0; i < expr.length(); i++) {
-        if (isalnum(expr[i])) {
-            operand += expr[i];
+string infixToPostfix(const string& infix) {
+    stack<char> s;
+    string postfix;
+    bool lastWasOperator = true;
+
+    for (char ch : infix) {
+        if (isalnum(ch)) {
+            postfix += ch;
+            lastWasOperator = false;
+        } else if (ch == '(') {
+            s.push(ch);
+            lastWasOperator = true;
+        } else if (ch == ')') {
+            while (!s.empty() && s.top() != '(') {
+                postfix += s.top();
+                s.pop();
+            }
+            if (!s.empty()) s.pop(); // pop '('
             lastWasOperator = false;
         } else {
-            if (!operand.empty()) {
-                postfix.push_back(operand);
-                operand.clear();
-            }
-            if (expr[i] == '(') {
-                operators.push(expr[i]);
-                lastWasOperator = true;
-            } else if (expr[i] == ')') {
-                while (!operators.empty() && operators.top() != '(') {
-                    postfix.push_back(string(1, operators.top()));
-                    operators.pop();
+            if (ch == '-' && lastWasOperator) {
+                s.push('~'); // unary minus as ~
+            } else {
+                while (!s.empty() && precedence(s.top()) >= precedence(ch)) {
+                    postfix += s.top();
+                    s.pop();
                 }
-                if (!operators.empty()) operators.pop(); // Pop '('
-                lastWasOperator = false;
-            } else if (precedence(expr[i]) > 0) {
-                if (expr[i] == '-' && lastWasOperator) {
-                    // Handle unary minus by converting it to a special token (e.g., "u-")
-                    operators.push('u');  // Use 'u' to represent unary minus
-                } else {
-                    while (!operators.empty() && precedence(operators.top()) >= precedence(expr[i])) {
-                        postfix.push_back(string(1, operators.top()));
-                        operators.pop();
-                    }
-                    operators.push(expr[i]);
-                }
-                lastWasOperator = true;
+                s.push(ch);
             }
+            lastWasOperator = true;
         }
     }
-    if (!operand.empty()) postfix.push_back(operand);
-    while (!operators.empty()) {
-        postfix.push_back(string(1, operators.top()));
-        operators.pop();
+
+    while (!s.empty()) {
+        postfix += s.top();
+        s.pop();
     }
+
     return postfix;
 }
 
-void generateTAC(const string& expr, vector<Quadruple>& quadruples, vector<Triple>& triples, vector<IndirectTriple>& indirectTriples) {
-    vector<string> postfix = infixToPostfix(expr);
-    stack<string> operands;
-    int tempCount = 1;
-    ostringstream output;
+void generateCodeFromPostfix(const string& postfix) {
+    stack<string> st;
 
-    output << "\nThree Address Code (TAC):\n";
-    for (const string& token : postfix) {
-        if (isalnum(token[0])) {
-            operands.push(token);
+    for (char ch : postfix) {
+        if (isalnum(ch)) {
+            st.push(string(1, ch));
         } else {
-            if (operands.size() < 2) {
-                cerr << "Error: Invalid expression (insufficient operands).\n";
-                return;
-            }
-            string arg2 = operands.top(); operands.pop();
-            string arg1 = operands.top(); operands.pop();
-            string temp = "t" + to_string(tempCount++);
+            if (ch == '~') {
+                string op = st.top(); st.pop();
+                string temp = newTemp();
+                threeAddressCode.push_back(temp + " = uminus " + op);
+                quadruples.push_back({"uminus", op, "", temp});
+                triples.push_back({"uminus", op, ""});
+                st.push(temp);
+            } else {
+                string op2 = st.top(); st.pop();
+                string op1 = st.top(); st.pop();
+                string temp = newTemp();
+                string op(1, ch);
 
-            output << temp << " = " << arg1 << " " << token << " " << arg2 << "\n";
-            quadruples.push_back({token, arg1, arg2, temp});
-            triples.push_back({token, arg1, arg2});
-            indirectTriples.push_back({static_cast<int>(triples.size() - 1)});
-            operands.push(temp);
+                if (op == "=") {
+                    threeAddressCode.push_back(op1 + " = " + op2);
+                    quadruples.push_back({"=", op2, "", op1});
+                    triples.push_back({"=", op1, op2});
+                    st.push(op1);
+                } else {
+                    threeAddressCode.push_back(temp + " = " + op1 + " " + op + " " + op2);
+                    quadruples.push_back({op, op1, op2, temp});
+                    triples.push_back({op, op1, op2});
+                    st.push(temp);
+                }
+            }
         }
     }
-    cout << output.str();
 }
 
-void displayQuadruples(const vector<Quadruple>& quadruples) {
-    cout << "\nQuadruple Representation:\n";
-    cout << "Op\tArg1\tArg2\tResult\n";
-    for (const auto& quad : quadruples) {
-        cout << quad.op << "\t" << quad.arg1 << "\t" << quad.arg2 << "\t" << quad.result << "\n";
-    }
-}
+void displayOutput() {
+    cout << "\n--- Three Address Code ---\n";
+    for (const auto& line : threeAddressCode)
+        cout << line << endl;
 
-void displayTriples(const vector<Triple>& triples) {
-    cout << "\nTriple Representation:\n";
-    cout << "Index\tOp\tArg1\tArg2\n";
-    for (size_t i = 0; i < triples.size(); i++) {
-        cout << i << "\t" << triples[i].op << "\t" << triples[i].arg1 << "\t" << triples[i].arg2 << "\n";
-    }
-}
+    cout << "\n--- Quadruple Representation ---\n";
+    cout << "Loc\tOp\tArg1\tArg2\tResult\n";
+    int loc = 1;
+    for (const auto& q : quadruples)
+        cout << "(" << loc++ << ")\t" << q.op << "\t" << q.arg1 << "\t" << q.arg2 << "\t" << q.result << endl;
 
-void displayIndirectTriples(const vector<IndirectTriple>& indirectTriples) {
-    cout << "\nIndirect Triple Representation:\n";
-    cout << "Index\tReference\n";
-    for (size_t i = 0; i < indirectTriples.size(); i++) {
-        cout << i << "\t" << indirectTriples[i].index << "\n";
-    }
+    cout << "\n--- Triple Representation ---\n";
+    cout << "Loc\tOp\tArg1\tArg2\n";
+    for (size_t i = 0; i < triples.size(); ++i)
+        cout << "(" << i+1 << ")\t" << triples[i].op << "\t" << triples[i].arg1 << "\t" << triples[i].arg2 << endl;
+
+    cout << "\n--- Indirect Triple Representation ---\n";
+    int base = 35;
+    for (size_t i = 0; i < triples.size(); ++i)
+        cout << base + i << "\t(" << i+1 << ")" << endl;
+
+    cout << "\nLoc\tOp\tArg1\tArg2\n";
+    for (size_t i = 0; i < triples.size(); ++i)
+        cout << "(" << i+1 << ")\t" << triples[i].op << "\t" << triples[i].arg1 << "\t" << triples[i].arg2 << endl;
 }
 
 int main() {
-    string expression;
-    cout << "Enter a simple arithmetic expression (e.g., (a+b)*c): ";
-    getline(cin, expression);
+    string infix;
+    cout << "Enter infix expression (with assignment): ";
+    getline(cin, infix);
 
-    vector<Quadruple> quadruples;
-    vector<Triple> triples;
-    vector<IndirectTriple> indirectTriples;
+    string postfix = infixToPostfix(infix);
 
-    generateTAC(expression, quadruples, triples, indirectTriples);
-    displayQuadruples(quadruples);
-    displayTriples(triples);
-    displayIndirectTriples(indirectTriples);
+    generateCodeFromPostfix(postfix);
+    displayOutput();
 
     return 0;
 }
