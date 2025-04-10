@@ -23,13 +23,11 @@ string newTemp() {
     return "T" + to_string(tempCount++);
 }
 
-inline int precedence(char op) {
-    switch (op) {
-        case '+': case '-': return 1;
-        case '*': case '/': return 2;
-        case '~': return 3; // unary minus
-        default: return 0;
-    }
+int precedence(char op) {
+    if (op == '~') return 3; // uminus has highest precedence
+    if (op == '*' || op == '/') return 2;
+    if (op == '+' || op == '-') return 1;
+    return 0;
 }
 
 string infixToPostfix(const string& infix) {
@@ -53,7 +51,7 @@ string infixToPostfix(const string& infix) {
             lastWasOperator = false;
         } else {
             if (ch == '-' && lastWasOperator) {
-                s.push('~'); // unary minus as ~
+                s.push('~'); // unary minus becomes ~
             } else {
                 while (!s.empty() && precedence(s.top()) >= precedence(ch)) {
                     postfix += s.top();
@@ -137,7 +135,7 @@ void displayOutput() {
 
 int main() {
     string infix;
-    cout << "Enter infix expression (with assignment): ";
+    cout << "Enter infix expression (with assignment if needed): ";
     getline(cin, infix);
 
     string postfix = infixToPostfix(infix);
