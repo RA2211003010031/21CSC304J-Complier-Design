@@ -3,10 +3,12 @@
 #include <vector>
 #include <string>
 #include <cctype>
+#include <unordered_map>
 
 using namespace std;
 
 int tempCount = 1;
+int loc = 1;
 vector<string> threeAddressCode;
 
 struct Quad {
@@ -19,12 +21,14 @@ struct Triple {
 };
 vector<Triple> triples;
 
+unordered_map<string, int> tempLocMap; // Track where each temp appeared
+
 string newTemp() {
     return "T" + to_string(tempCount++);
 }
 
 int precedence(char op) {
-    if (op == '~') return 3; // uminus has highest precedence
+    if (op == '~') return 3;
     if (op == '*' || op == '/') return 2;
     if (op == '+' || op == '-') return 1;
     return 0;
@@ -47,11 +51,11 @@ string infixToPostfix(const string& infix) {
                 postfix += s.top();
                 s.pop();
             }
-            if (!s.empty()) s.pop(); // pop '('
+            if (!s.empty()) s.pop();
             lastWasOperator = false;
         } else {
             if (ch == '-' && lastWasOperator) {
-                s.push('~'); // unary minus becomes ~
+                s.push('~');
             } else {
                 while (!s.empty() && precedence(s.top()) >= precedence(ch)) {
                     postfix += s.top();
@@ -71,6 +75,12 @@ string infixToPostfix(const string& infix) {
     return postfix;
 }
 
+string getLOCRef(const string& operand) {
+    if (tempLocMap.find(operand) != tempLocMap.end())
+        return "(" + to_string(tempLocMap[operand]) + ")";
+    return operand;
+}
+
 void generateCodeFromPostfix(const string& postfix) {
     stack<string> st;
 
@@ -83,7 +93,8 @@ void generateCodeFromPostfix(const string& postfix) {
                 string temp = newTemp();
                 threeAddressCode.push_back(temp + " = uminus " + op);
                 quadruples.push_back({"uminus", op, "", temp});
-                triples.push_back({"uminus", op, ""});
+                triples.push_back({"uminus", getLOCRef(op), ""});
+                tempLocMap[temp] = loc++;
                 st.push(temp);
             } else {
                 string op2 = st.top(); st.pop();
@@ -94,12 +105,13 @@ void generateCodeFromPostfix(const string& postfix) {
                 if (op == "=") {
                     threeAddressCode.push_back(op1 + " = " + op2);
                     quadruples.push_back({"=", op2, "", op1});
-                    triples.push_back({"=", op1, op2});
+                    triples.push_back({"=", getLOCRef(op1), getLOCRef(op2)});
                     st.push(op1);
                 } else {
                     threeAddressCode.push_back(temp + " = " + op1 + " " + op + " " + op2);
                     quadruples.push_back({op, op1, op2, temp});
-                    triples.push_back({op, op1, op2});
+                    triples.push_back({op, getLOCRef(op1), getLOCRef(op2)});
+                    tempLocMap[temp] = loc++;
                     st.push(temp);
                 }
             }
@@ -114,11 +126,11 @@ void displayOutput() {
 
     cout << "\n--- Quadruple Representation ---\n";
     cout << "Loc\tOp\tArg1\tArg2\tResult\n";
-    int loc = 1;
+    int qloc = 1;
     for (const auto& q : quadruples)
-        cout << "(" << loc++ << ")\t" << q.op << "\t" << q.arg1 << "\t" << q.arg2 << "\t" << q.result << endl;
+        cout << "(" << qloc++ << ")\t" << q.op << "\t" << q.arg1 << "\t" << q.arg2 << "\t" << q.result << endl;
 
-    cout << "\n--- Triple Representation ---\n";
+    cout << "\n--- Triple Representation (using LOCs) ---\n";
     cout << "Loc\tOp\tArg1\tArg2\n";
     for (size_t i = 0; i < triples.size(); ++i)
         cout << "(" << i+1 << ")\t" << triples[i].op << "\t" << triples[i].arg1 << "\t" << triples[i].arg2 << endl;
@@ -139,7 +151,6 @@ int main() {
     getline(cin, infix);
 
     string postfix = infixToPostfix(infix);
-
     generateCodeFromPostfix(postfix);
     displayOutput();
 

@@ -3,10 +3,12 @@
 #include <vector>
 #include <string>
 #include <cctype>
+#include <unordered_map>
 
 using namespace std;
 
 int tempCount = 1;
+int loc = 1;
 vector<string> threeAddressCode;
 
 struct Quad {
@@ -18,6 +20,9 @@ struct Triple {
     string op, arg1, arg2;
 };
 vector<Triple> triples;
+
+// Maps temp variable (T1, T2...) to LOC index in triples
+unordered_map<string, int> tempLocMap;
 
 string newTemp() {
     return "T" + to_string(tempCount++);
@@ -73,6 +78,12 @@ string infixToPostfix(const string& infix) {
     return postfix;
 }
 
+string getLOCRef(const string& operand) {
+    if (tempLocMap.find(operand) != tempLocMap.end())
+        return "(" + to_string(tempLocMap[operand]) + ")";
+    return operand;
+}
+
 void generateCodeFromPostfix(const string& postfix) {
     stack<string> st;
 
@@ -85,7 +96,8 @@ void generateCodeFromPostfix(const string& postfix) {
                 string temp = newTemp();
                 threeAddressCode.push_back(temp + " = uminus " + op);
                 quadruples.push_back({"uminus", op, "", temp});
-                triples.push_back({"uminus", op, ""});
+                triples.push_back({"uminus", getLOCRef(op), ""});
+                tempLocMap[temp] = loc++;
                 st.push(temp);
             } else {
                 string op2 = st.top(); st.pop();
@@ -96,12 +108,13 @@ void generateCodeFromPostfix(const string& postfix) {
                 if (op == "=") {
                     threeAddressCode.push_back(op1 + " = " + op2);
                     quadruples.push_back({"=", op2, "", op1});
-                    triples.push_back({"=", op1, op2});
+                    triples.push_back({"=", getLOCRef(op1), getLOCRef(op2)});
                     st.push(op1);
                 } else {
                     threeAddressCode.push_back(temp + " = " + op1 + " " + op + " " + op2);
                     quadruples.push_back({op, op1, op2, temp});
-                    triples.push_back({op, op1, op2});
+                    triples.push_back({op, getLOCRef(op1), getLOCRef(op2)});
+                    tempLocMap[temp] = loc++;
                     st.push(temp);
                 }
             }
@@ -116,11 +129,11 @@ void displayOutput() {
 
     cout << "\n--- Quadruple Representation ---\n";
     cout << "Loc\tOp\tArg1\tArg2\tResult\n";
-    int loc = 1;
+    int qloc = 1;
     for (const auto& q : quadruples)
-        cout << "(" << loc++ << ")\t" << q.op << "\t" << q.arg1 << "\t" << q.arg2 << "\t" << q.result << endl;
+        cout << "(" << qloc++ << ")\t" << q.op << "\t" << q.arg1 << "\t" << q.arg2 << "\t" << q.result << endl;
 
-    cout << "\n--- Triple Representation ---\n";
+    cout << "\n--- Triple Representation (using LOCs) ---\n";
     cout << "Loc\tOp\tArg1\tArg2\n";
     for (size_t i = 0; i < triples.size(); ++i)
         cout << "(" << i+1 << ")\t" << triples[i].op << "\t" << triples[i].arg1 << "\t" << triples[i].arg2 << endl;
@@ -130,7 +143,7 @@ void displayOutput() {
     for (size_t i = 0; i < triples.size(); ++i)
         cout << base + i << "\t(" << i+1 << ")" << endl;
 
-    cout << "\nLoc\tOp\tArg1\tArg2\n";
+    cout << "\nLOC\tOp\tArg1\tArg2\n";
     for (size_t i = 0; i < triples.size(); ++i)
         cout << "(" << i+1 << ")\t" << triples[i].op << "\t" << triples[i].arg1 << "\t" << triples[i].arg2 << endl;
 }
